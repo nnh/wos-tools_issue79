@@ -37,8 +37,7 @@ function getLatestDateFolder(
  * @param {Array} pmidArray PubMedのPMID配列
  * @returns {string} PubMedのXMLデータ
  */
-async function readPubMedXml(pmidArray) {
-  const outputPath = path.join(__dirname, "..", "output");
+async function readPubMedXml(pmidArray, outputPath) {
   const filename = "pubmed.xml";
   const pubmedDataPath = path.join(outputPath, filename);
 
@@ -59,9 +58,9 @@ function readRawJson(inputDir) {
   return rawJson;
 }
 
-async function extractWoSIDsFromHtmlFiles() {
+async function extractWoSIDsFromHtmlFiles(inputDir) {
   const inputDirectory = getLatestDateFolder(
-    getLatestDateFolder(),
+    getLatestDateFolder(inputDir),
     /(?<=result_)\d{14}/
   );
   const files = await fs.promises.readdir(inputDirectory);
@@ -158,4 +157,5 @@ module.exports = {
   readPubMedXml,
   extractWoSIDsFromHtmlFiles,
   convertToCsv,
+  fileUtilsWriteFile,
 };

@@ -5,10 +5,11 @@ const {
   readRawJson,
   readPubMedXml,
   extractWoSIDsFromHtmlFiles,
+  fileUtilsWriteFile,
 } = require("./fileUtils");
 const { parsePubMedData } = require("./pubmedApiUtils");
 const { extractRecordsFromRawJson } = require("./jsonDataProcessor");
-//const { processRecordsWithNHOAuthors } = require("./publishedUtils");
+const { processRecordsWithNHOAuthors } = require("./publishedUtils");
 // JSON結合データとメタデータの結合関数
 function mergeData(jsonData, metadata) {
   const pubmedData = new Map(metadata);
@@ -49,12 +50,7 @@ function checkForHTMLWoSIDsExistence(jsonData, uids) {
   });
   return htmlWoSIDsExist;
 }
-
-// メインの処理
-async function main() {
-  //try {
-  // raw.jsonのデータを読み込む
-  const rawJson = readRawJson(path.join(__dirname, "..", "data"));
+async function mergeJsonWithPubMedData(rawJson, outputDir) {
   // UID, PMID, addressNameのみを抽出したMapの配列を作成する
   const parsedJson = extractRecordsFromRawJson(rawJson);
   // JSONファイル内のPMIDを重複なしで抽出する
@@ -67,24 +63,45 @@ async function main() {
     )
   );
   // PubMedデータを取得する
-  const metadata = await readPubMedXml(pmidArray);
-  return;
-  const parsedMetadata = parsePubMedData(metadata);
+  const pubmedData = await readPubMedXml(pmidArray, outputDir);
+  const parsedMetadata = parsePubMedData(pubmedData);
   // JSONデータとPubMedデータを結合する
   const mergedData = mergeData(parsedJson, parsedMetadata);
-  console.log(mergedData.length);
-  // DEPが20220101以上または空白のデータのみを抽出する
-  const filteredMergedData = filterDataByDep(mergedData);
-  console.log(filteredMergedData.length);
+  return mergedData;
+}
+async function compareUIDsAndMergeStatus(inputDir, filteredMergedData) {
   // publication_YYYY_MM.htmlを読み込んでUIDを抽出する
-  const htmlWoSIDs = await extractWoSIDsFromHtmlFiles();
+  const htmlWoSIDs = await extractWoSIDsFromHtmlFiles(inputDir);
   // 抽出したUIDとJSON結合データのUIDを比較し、一致するものにtrueを付与する
   const htmlWoSIDsExist = checkForHTMLWoSIDsExistence(
     filteredMergedData,
     htmlWoSIDs
   );
+  return htmlWoSIDsExist;
+}
+// メインの処理
+async function main() {
+  //try {
+  const inputDir = path.join(__dirname, "..", "data");
+  const outputDir = path.join(__dirname, "..", "output");
+  // raw.jsonのデータを読み込む
+  const rawJson = readRawJson(inputDir);
+  // JSONデータとPubMedデータを結合する
+  const mergedData = await mergeJsonWithPubMedData(rawJson, outputDir);
+  // DEPが20220101以上または空白のデータのみを抽出する
+  const filteredMergedData = filterDataByDep(mergedData);
+  // publication_YYYY_MM.htmlを読み込んでUIDを抽出する
+  // 抽出したUIDとJSON結合データのUIDを比較し、一致するものにtrueを付与する
+  const htmlWoSIDsExist = await compareUIDsAndMergeStatus(
+    inputDir,
+    filteredMergedData
+  );
+  console.log(
+    "抽出したUIDとJSON結合データのUIDを比較し、一致するものにtrueを付与する"
+  );
+  console.log(htmlWoSIDsExist[0]);
   // HTMLファイルに出力されていないWoSIDかつNHO著者の可能性のあるレコードを抽出する
-  processRecordsWithNHOAuthors(htmlWoSIDsExist);
+  processRecordsWithNHOAuthors(htmlWoSIDsExist, outputDir);
   // 結果を出力する
 
   //  console.log("処理が完了しました。");
